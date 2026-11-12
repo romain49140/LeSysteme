@@ -254,6 +254,24 @@ details.inst p{margin:0 0 12px}
 <div id="layer"></div>
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
+<script>window.FBP=new Promise(function(r){window.__fbres=r});</script>
+<script type="module">
+try{
+  const base='https://www.gstatic.com/firebasejs/10.14.1/';
+  const A=await import(base+'firebase-app.js');
+  const Au=await import(base+'firebase-auth.js');
+  const F=await import(base+'firebase-firestore.js');
+  const app=A.initializeApp({
+  apiKey: "AIzaSyA473392hNotW7YlSrsMf-ctzaq3faX2Ns",
+  authDomain: "lesysteme.firebaseapp.com",
+  projectId: "lesysteme",
+  storageBucket: "lesysteme.firebasestorage.app",
+  messagingSenderId: "605584271537",
+  appId: "1:605584271537:web:0aa4c93571472f57f29a90"
+});
+  window.__fbres({Au:Au,F:F,auth:Au.getAuth(app),fs:F.getFirestore(app)});
+}catch(e){window.__fbres(null)}
+</script>
 <script>
 (function(){
 'use strict';
@@ -1041,6 +1059,7 @@ function viewStatus(){
   <section class="win">
     <div class="wh"><span>Données</span></div>
     <p class="small dim">Ta progression est enregistrée dans ce navigateur${cloud.uid?' et synchronisée sur ton compte':''}.</p>
+    ${accountCard()}
     ${backupBlock()}
     ${installHelp()}
     <div id="resetzone" style="margin-top:10px"><button class="btn bad sm" data-a="reset">Réinitialiser mon personnage</button></div>
@@ -1687,8 +1706,8 @@ function viewRank(){
   const byName=(a,b)=>a.name.localeCompare(b.name,'fr');
   const tie=(a,b)=>b.prestige-a.prestige||b.level-a.level||byName(a,b);
   const msg=cloud.status==='sync'
-    ?(cloud.readOnly?'<div class="note">Ton accès est en lecture seule : tu vois le classement mais tu n’y apparais pas. Demande l’accès Contributeur au propriétaire de la page.</div>':`<div class="info">Classement en direct. Partage le lien de cette page avec l’accès Contributeur pour que tes amis rejoignent la compétition.</div>`)
-    :'<div class="note">Mode solo : le classement partagé n’est pas disponible dans cette vue. Connecte-toi et ouvre la page depuis son lien partagé pour te mesurer aux autres joueurs.</div>';
+    ?(cloud.readOnly?'<div class="note">Ta fiche n’a pas pu être publiée : tu vois le classement mais tu n’y apparais pas pour l’instant. Déconnecte-toi puis reconnecte-toi.</div>':`<div class="info">Classement en direct. Envoie l’adresse de l’application à tes amis : ils créent un compte, saisissent le même code de groupe, et vous vous retrouvez ici.</div>`)
+    :'<div class="note">Le classement n’a pas pu se charger (connexion ou droits). Vérifie ta connexion internet, puis recharge la page.</div>';
   const seg=`<section class="win" style="padding-bottom:12px"><div class="seg" role="group" aria-label="Classement">${[['month','Mois'],['friends','Amis'],['duel','Défis']].map(x=>`<button aria-pressed="${mode===x[0]}" data-a="lb-mode" data-m="${x[0]}">${x[1]}</button>`).join('')}</div></section>`;
   if(mode==='friends') return seg+viewFriends(rows,cm,tie,msg);
   if(mode==='duel') return seg+viewDuels(rows,msg);
@@ -1811,6 +1830,7 @@ const NAV=[['status','Statut','status'],['progress','Progrès','chart'],['perf',
 function render(){
   const app=$('#app');
   ui.day=today();
+  if(!cloud.uid){app.innerHTML=viewAuth();return}
   if(!S&&!ui.wz) ui.wz=newWizard('new');
   if(ui.wz){app.innerHTML=viewWizard();return}
   if(S) reconcile();
@@ -2010,13 +2030,20 @@ document.addEventListener('click',e=>{
       const c=ensureCustom(ui.editDay);if(!c.items) break;
       if(c.items.length>=14){toast('14 exercices maximum par séance.');break}
       c.items.push(rx?{n:nm,k:'acc',r:rx}:{n:nm,k:'acc'});save();render();break}
+    case 'au-mode': auKeep();ui.auth.mode=D.m==='signup'||D.m==='reset'?D.m:'login';ui.auth.err='';ui.auth.info='';render();break;
+    case 'au-submit': auSubmit();break;
+    case 'au-reload': location.reload();break;
+    case 'au-logout': auLogout();break;
+    case 'au-del': ui.auDel=true;ui.auErr='';render();break;
+    case 'au-del-no': ui.auDel=false;ui.auErr='';render();break;
+    case 'au-del-yes': auDelete();break;
     case 'edit-profile': ui.wz=newWizard('edit'); render(); window.scrollTo(0,0); break;
     case 'reset':
       $('#resetzone').innerHTML='<p class="small bad" style="margin-bottom:8px">Toute ta progression sera effacée. Cette action est définitive.</p><div class="row"><button class="btn bad sm" data-a="reset-yes">Oui, tout effacer</button><button class="btn sm" data-a="reset-no">Annuler</button></div>';break;
     case 'reset-no': render(); break;
     case 'reset-yes':
       S=null;memStore=null;try{localStorage.removeItem(KEY)}catch(err){}
-      if(cloud.db&&cloud.uid){try{cloud.db.doc('data/users/'+cloud.uid+'/save').delete().catch(()=>{});if(!cloud.readOnly)cloud.db.doc('players/'+cloud.uid).delete().catch(()=>{})}catch(err){}}
+      if(cloud.db&&cloud.uid){try{cloud.db.doc('saves/'+cloud.uid).delete().catch(()=>{});if(!cloud.readOnly)cloud.db.doc('players/'+cloud.uid).delete().catch(()=>{})}catch(err){}}
       ui.tab='status';ui.wz=newWizard('new');render();window.scrollTo(0,0);break;
     case 'wz-gear':{const g=gearList(ui.wz.v.gear),i=g.indexOf(D.g);if(i>=0) g.splice(i,1); else g.push(D.g);ui.wz.v.gear=gearList(g).join(',');render();break}
     case 'wz-set': ui.wz.v[D.k]=D.v; ui.wz.err=''; render(); break;
@@ -2069,45 +2096,164 @@ document.addEventListener('change',e=>{
   }
 });
 document.addEventListener('toggle',e=>{const el=e.target;if(el&&el.dataset&&el.dataset.day!=null&&ui.editDay==null) ui.open[el.dataset.day]=!!el.open},true);
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#layer .modal')) closeModal()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#layer .modal')) closeModal();if(e.key==='Enter'&&e.target&&/^au_(mail|pw|pw2)$/.test(e.target.id)){e.preventDefault();auSubmit()}if(e.key==='Enter'&&e.target&&e.target.id==='au_delpw'){e.preventDefault();auDelete()}});
 
 /* ---------- compte et classement partagé ---------- */
+let FB=null,cloudUnsub=null;
+ui.auth={ready:false,fail:false,mode:'login',err:'',info:'',busy:false,mail:''};
+function mkDb(fb){
+  const F=fb.F,fs=fb.fs;
+  return {
+    doc:p=>({
+      get:async()=>{const s=await F.getDoc(F.doc(fs,p));return {exists:s.exists(),data:()=>s.data()}},
+      set:d=>F.setDoc(F.doc(fs,p),d),
+      delete:()=>F.deleteDoc(F.doc(fs,p))
+    }),
+    collection:n=>({limit:k=>({onSnapshot:(ok,err)=>F.onSnapshot(F.query(F.collection(fs,n),F.limit(k)),ok,err)})})
+  };
+}
 async function initCloud(){
+  let fb=null;
+  try{fb=await window.FBP}catch(e){}
+  if(!fb){ui.auth.fail=true;ui.auth.ready=true;render();return}
+  FB=fb;cloud.db=mkDb(fb);
+  fb.Au.onAuthStateChanged(fb.auth,async u=>{
+    if(!u){
+      clearTimeout(cloud.sTimer);clearTimeout(cloud.pTimer);
+      if(cloudUnsub){try{cloudUnsub()}catch(e){}cloudUnsub=null}
+      cloud.uid=null;cloud.status='local';cloud.players=[];S=null;ui.wz=null;ui.auDel=false;ui.auErr='';ui.auth.ready=true;
+      render();return;
+    }
+    try{await onSignedIn(u)}catch(e){ui.auth.ready=true;render()}
+  });
+}
+async function onSignedIn(u){
+  const uid=u.uid;
+  let prev=null;try{prev=localStorage.getItem('sysq.uid')}catch(e){}
+  if(prev&&prev!==uid){S=null;memStore=null;try{localStorage.removeItem(KEY)}catch(e){}}
+  try{localStorage.setItem('sysq.uid',uid)}catch(e){}
+  if(!S){const raw=lsGet();if(raw){try{S=migrate(JSON.parse(raw))}catch(e){S=null}}}
+  cloud.uid=uid;cloud.status='sync';cloud.readOnly=false;
+  ui.auth.ready=true;ui.auth.err='';ui.auth.info='';ui.wz=null;ui.auDel=false;ui.auErr='';
   try{
-    const c=window.claude; if(!c||!c.use) return;
-    const [db,user]=await Promise.all([c.use('db'),c.use('user')]);
-    if(!db||!user) return;
-    const uid=await user.id(); if(!uid) return;
-    cloud.db=db;cloud.uid=uid;cloud.status='sync';
-    try{
-      const snap=await db.doc('data/users/'+uid+'/save').get();
-      if(snap.exists){
-        const r=snap.data()||{};
-        if(typeof r.json==='string'&&(!S||(r.t||0)>S.t)){
-          const rs=migrate(JSON.parse(r.json));
-          if(rs){S=rs;lsSet(JSON.stringify(S));ui.wz=null;reconcile();toast('Progression restaurée depuis ton compte.')}
-        } else if(S&&S.t>(r.t||0)) schedulePush();
-      } else if(S) schedulePush();
-    }catch(e){}
-    try{
-      db.collection('players').limit(200).onSnapshot(snap=>{
-        cloud.players=snap.docs.map(d=>sanitizeRow(d.id,d.data()));
-        if(S&&!ui.wz&&ui.tab==='rank') render();
-      },()=>{cloud.status='local'});
-    }catch(e){}
-    if(S) syncPlayer();
-    render();
-  }catch(e){cloud.status='local'}
+    const snap=await cloud.db.doc('saves/'+uid).get();
+    if(snap.exists){
+      const r=snap.data()||{};
+      if(typeof r.json==='string'&&(!S||(r.t||0)>S.t)){
+        const rs=migrate(JSON.parse(r.json));
+        if(rs){S=rs;lsSet(JSON.stringify(S));reconcile();toast('Progression restaurée depuis ton compte.')}
+      } else if(S&&S.t>(r.t||0)) schedulePush();
+    } else if(S) schedulePush();
+  }catch(e){}
+  if(cloudUnsub){try{cloudUnsub()}catch(e){}cloudUnsub=null}
+  try{
+    cloudUnsub=cloud.db.collection('players').limit(200).onSnapshot(snap=>{
+      cloud.players=snap.docs.map(d=>sanitizeRow(d.id,d.data()));
+      const ae=document.activeElement;
+      if(S&&!ui.wz&&ui.tab==='rank'&&!(ae&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName))) render();
+    },()=>{cloud.status='local'});
+  }catch(e){}
+  if(S){reconcile();syncPlayer()}
+  render();
+}
+function auMsg(e){
+  const c=(e&&e.code)||'';
+  if(c==='auth/invalid-credential'||c==='auth/wrong-password'||c==='auth/user-not-found'||c==='auth/invalid-login-credentials') return 'Adresse e-mail ou mot de passe incorrect.';
+  if(c==='auth/email-already-in-use') return 'Un compte existe déjà avec cette adresse. Connecte-toi.';
+  if(c==='auth/weak-password') return 'Mot de passe trop faible : 8 caractères minimum.';
+  if(c==='auth/invalid-email') return 'Adresse e-mail invalide.';
+  if(c==='auth/too-many-requests') return 'Trop d’essais. Réessaie dans quelques minutes.';
+  if(c==='auth/network-request-failed') return 'Pas de connexion internet.';
+  if(c==='auth/requires-recent-login') return 'Reconnecte-toi puis réessaie.';
+  if(c==='auth/operation-not-allowed') return 'La connexion par e-mail n’est pas activée sur le projet.';
+  return 'Une erreur est survenue. Réessaie.';
+}
+function auKeep(){const m=$('#au_mail');if(m) ui.auth.mail=m.value.trim().slice(0,120)}
+async function auSubmit(){
+  const a=ui.auth;if(a.busy||!FB) return;
+  auKeep();
+  const mail=a.mail,pw=String((($('#au_pw')||{}).value)||''),pw2=String((($('#au_pw2')||{}).value)||'');
+  a.err='';a.info='';
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)){a.err='Adresse e-mail invalide.';render();return}
+  if(a.mode!=='reset'){
+    if(!pw){a.err='Saisis ton mot de passe.';render();return}
+    if(a.mode==='signup'){
+      if(pw.length<8){a.err='Mot de passe trop court : 8 caractères minimum.';render();return}
+      if(pw!==pw2){a.err='Les deux mots de passe ne correspondent pas.';render();return}
+    }
+  }
+  a.busy=true;const b=document.querySelector('[data-a="au-submit"]');if(b) b.disabled=true;
+  try{
+    if(a.mode==='reset'){await FB.Au.sendPasswordResetEmail(FB.auth,mail);a.info='Si un compte existe avec cette adresse, un e-mail de réinitialisation vient d’être envoyé. Pense à regarder les courriers indésirables.';a.busy=false;render();return}
+    if(a.mode==='signup') await FB.Au.createUserWithEmailAndPassword(FB.auth,mail,pw);
+    else await FB.Au.signInWithEmailAndPassword(FB.auth,mail,pw);
+    a.busy=false;
+  }catch(e){a.busy=false;a.err=auMsg(e);render()}
+}
+async function auLogout(){
+  if(!FB) return;
+  try{await FB.Au.signOut(FB.auth)}catch(e){toast('Déconnexion impossible.')}
+  ui.auth.mode='login';ui.tab='status';
+}
+async function auDelete(){
+  if(!FB) return;
+  const u=FB.auth.currentUser;if(!u) return;
+  const pw=String((($('#au_delpw')||{}).value)||'');
+  if(!pw){ui.auErr='Saisis ton mot de passe.';render();return}
+  try{
+    await FB.Au.reauthenticateWithCredential(u,FB.Au.EmailAuthProvider.credential(u.email,pw));
+  }catch(e){ui.auErr=auMsg(e);render();return}
+  try{
+    clearTimeout(cloud.sTimer);clearTimeout(cloud.pTimer);
+    cloud.readOnly=true;
+    await cloud.db.doc('players/'+u.uid).delete();
+    await cloud.db.doc('saves/'+u.uid).delete();
+    await FB.Au.deleteUser(u);
+  }catch(e){cloud.readOnly=false;ui.auErr=auMsg(e);render();return}
+  S=null;memStore=null;
+  try{localStorage.removeItem(KEY);localStorage.removeItem('sysq.uid')}catch(e){}
+  ui.auDel=false;ui.auErr='';ui.tab='status';ui.auth.mode='signup';
+  toast('Compte supprimé.');
+}
+function viewAuth(){
+  const a=ui.auth,hd='<div class="wh"><span>LeSysteme</span><span class="dim">Compte</span></div>';
+  const wrap=b=>`<div class="shell"><main id="main" class="shell"><section class="win">${hd}${b}</section></main></div>`;
+  if(!a.ready) return wrap('<p class="lead">Connexion en cours…</p>');
+  if(a.fail) return wrap('<p class="lead">Le service de connexion n’a pas pu se charger. Vérifie ta connexion internet, puis recharge la page.</p><button class="btn pri" data-a="au-reload">Recharger</button>');
+  const m=a.mode;
+  const ttl=m==='signup'?'Créer un compte':m==='reset'?'Mot de passe oublié':'Se connecter';
+  const lead=m==='signup'?'Ton adresse e-mail sert uniquement à retrouver ta progression sur n’importe quel appareil. Elle n’apparaît jamais dans le classement.':m==='reset'?'Saisis ton adresse : tu recevras un lien pour choisir un nouveau mot de passe.':'Connecte-toi pour retrouver ta progression, le classement et les défis.';
+  return wrap(`<h2 style="font:600 20px var(--f-d);margin:0 0 6px">${ttl}</h2><p class="lead">${lead}</p>
+    <div class="fld"><label for="au_mail">Adresse e-mail</label><input class="in" id="au_mail" type="email" inputmode="email" autocomplete="email" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="120" value="${esc(a.mail)}"></div>
+    ${m!=='reset'?`<div class="fld" style="margin-top:10px"><label for="au_pw">Mot de passe</label><input class="in" id="au_pw" type="password" autocomplete="${m==='signup'?'new-password':'current-password'}" maxlength="128"></div>`:''}
+    ${m==='signup'?`<div class="fld" style="margin-top:10px"><label for="au_pw2">Confirme le mot de passe</label><input class="in" id="au_pw2" type="password" autocomplete="new-password" maxlength="128"><span class="small dim">8 caractères minimum.</span></div>`:''}
+    ${a.err?`<div class="err" role="alert">${esc(a.err)}</div>`:''}
+    ${a.info?`<div class="info" role="status">${esc(a.info)}</div>`:''}
+    <div class="row" style="margin-top:14px"><button class="btn pri" data-a="au-submit">${m==='signup'?'Créer mon compte':m==='reset'?'Envoyer le lien':'Se connecter'}</button></div>
+    <div class="row" style="margin-top:14px;gap:8px;flex-wrap:wrap">
+      ${m!=='login'?'<button class="btn sm" data-a="au-mode" data-m="login">J’ai déjà un compte</button>':''}
+      ${m!=='signup'?'<button class="btn sm" data-a="au-mode" data-m="signup">Créer un compte</button>':''}
+      ${m==='login'?'<button class="btn sm" data-a="au-mode" data-m="reset">Mot de passe oublié</button>':''}
+    </div>`);
+}
+function accountCard(){
+  const u=FB&&FB.auth.currentUser,mail=u?esc(u.email||''):'';
+  return `<div class="kv" style="margin-top:10px"><span>Compte</span><span class="mono" style="overflow-wrap:anywhere;text-align:right">${mail}</span></div>
+    <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap"><button class="btn sm" data-a="au-logout">Se déconnecter</button><button class="btn bad sm" data-a="au-del">Supprimer mon compte</button></div>
+    ${ui.auDel?`<div class="info"><p class="small bad" style="margin:0">Ton compte, ta progression en ligne et ta place au classement seront effacés définitivement. Saisis ton mot de passe pour confirmer.</p>
+      <div class="fld" style="margin-top:8px"><label for="au_delpw">Mot de passe</label><input class="in" id="au_delpw" type="password" autocomplete="current-password" maxlength="128"></div>
+      ${ui.auErr?`<div class="err" role="alert">${esc(ui.auErr)}</div>`:''}
+      <div class="row" style="margin-top:8px;gap:8px"><button class="btn bad sm" data-a="au-del-yes">Supprimer définitivement</button><button class="btn sm" data-a="au-del-no">Annuler</button></div></div>`:''}`;
 }
 function schedulePush(){
   if(!cloud.db||!cloud.uid) return;
   clearTimeout(cloud.sTimer);cloud.sTimer=setTimeout(pushNow,2500);
 }
 async function pushNow(){
-  if(!cloud.db||!S) return;
+  if(!cloud.db||!cloud.uid||!S) return;
   if(cloud.saving){cloud.pending=true;return}
   cloud.saving=true;
-  try{await cloud.db.doc('data/users/'+cloud.uid+'/save').set({t:S.t,json:JSON.stringify(S)})}catch(e){}
+  try{await cloud.db.doc('saves/'+cloud.uid).set({t:S.t,json:JSON.stringify(S)})}catch(e){}
   cloud.saving=false;
   if(cloud.pending){cloud.pending=false;schedulePush()}
 }
@@ -2118,7 +2264,7 @@ function syncPlayer(){
     if(cloud.pDirty) return;
     cloud.pDirty=true;
     try{await cloud.db.doc('players/'+cloud.uid).set(playerDoc())}
-    catch(e){if(e&&e.code==='invalid_argument'){cloud.readOnly=true;if(ui.tab==='rank'&&S&&!ui.wz)render()}}
+    catch(e){if(e&&(e.code==='invalid_argument'||e.code==='permission-denied')){cloud.readOnly=true;if(ui.tab==='rank'&&S&&!ui.wz)render()}}
     cloud.pDirty=false;
   },1200);
 }
